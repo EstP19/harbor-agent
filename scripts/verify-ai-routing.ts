@@ -1,7 +1,7 @@
 // Run inside the deployed container. Uses synthetic data and prints no credentials.
 import '../lib/runtime-env.ts';
 import assert from 'node:assert/strict';
-import {createCanvas} from '@napi-rs/canvas';
+import {readFile} from 'node:fs/promises';
 import {generateAiJsonResponse} from '../lib/ai-provider.ts';
 import {createPreferredGeneration} from '../agent/capabilities/chatgpt-plan/preferred-generation.ts';
 import {PlanError} from '../agent/capabilities/chatgpt-plan/openai.ts';
@@ -15,13 +15,11 @@ async function main() {
   assert.equal(primary.model,'gpt-6-luna');assert.equal(primary.reasoningEffort,'high');
   console.log(JSON.stringify({check:'primary_json',ok:true,billingSource:primary.billingSource,model:primary.model,reasoningEffort:primary.reasoningEffort}));
 
-  const canvas=createCanvas(800,160),ctx=canvas.getContext('2d');
-  ctx.fillStyle='white';ctx.fillRect(0,0,800,160);ctx.fillStyle='black';ctx.font='32px sans-serif';
-  ctx.fillText('SYNTHETIC HARBOR CHECK 42',25,90);
-  const imageBase64=canvas.toBuffer('image/png').toString('base64');
-  const vision=await generateAiJsonResponse({systemPrompt:'Read the image. Return JSON with text containing the visible text.',userPrompt:'Transcribe this synthetic image.',imageBase64,imageMimeType:'image/png'});
+  // Use a fixed synthetic raster: minimal Linux images may not contain any system fonts.
+  const imageBase64=(await readFile(new URL('../tests/fixtures/multilingual-functional.jpg',import.meta.url))).toString('base64');
+  const vision=await generateAiJsonResponse({systemPrompt:'Read the image. Return JSON with text containing the visible text.',userPrompt:'Transcribe this synthetic image.',imageBase64,imageMimeType:'image/jpeg'});
   assert.equal(vision?.billingSource,'chatgpt-plan');
-  assert.match(String(vision?.parsed?.text),/HARBOR.*42/i);
+  assert.match(String(vision?.parsed?.text),/HARBOR HEALTH/i);
   console.log(JSON.stringify({check:'primary_vision',ok:true,billingSource:vision?.billingSource}));
 
   const baseUrl=`http://127.0.0.1:${process.env.PORT||2000}`;
@@ -29,11 +27,11 @@ async function main() {
   assert.equal(denied.status,401);
   const response=await fetch(baseUrl+'/api/capabilities/health-image-ocr',{
     method:'POST',headers:{Authorization:`Bearer ${process.env.HARBOR_HEALTH_SERVICE_TOKEN}`,'Content-Type':'application/json'},
-    body:JSON.stringify({documentContent:imageBase64,mimeType:'image/png',documentType:'general_health'}),signal:AbortSignal.timeout(170_000),
+    body:JSON.stringify({documentContent:imageBase64,mimeType:'image/jpeg',documentType:'general_health'}),signal:AbortSignal.timeout(170_000),
   });
   const value=await response.json();
   assert.equal(response.status,200);assert.equal(value.success,true);
-  assert.match(String(value.data?.extractedText),/HARBOR.*42/i);
+  assert.match(String(value.data?.extractedText),/HARBOR HEALTH/i);
   console.log(JSON.stringify({check:'authenticated_health_ocr_http',ok:true,httpStatus:response.status,unauthorizedStatus:denied.status}));
 
   // Simulate an exhausted plan in this CLI only, leaving the server and linked session untouched.
