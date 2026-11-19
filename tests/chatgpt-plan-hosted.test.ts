@@ -85,6 +85,9 @@ test('hosted authorization waits for approval and consumes each callback once ac
       const recipient=await vm.prepareImport(owner);
       assert.equal('d' in recipient.publicKey,false);
       const hostId=recipient.hostId;
+      const delegated=createChatGptSession({origin:'http://127.0.0.1:1455',localSecret:'fixture-local-encryption-key',
+        directory:join(directory,'delegated'),authorizationHostId:hostId});
+      assert.equal(new URL((await delegated.start(owner)).authorizationUrl).searchParams.get('ext_agent_host_id'),hostId);
       const local=createChatGptSession({origin:'http://127.0.0.1:1455',localSecret:'fixture-local-encryption-key',directory});
       const started=await local.start(owner);
       const url=new URL(started.authorizationUrl);

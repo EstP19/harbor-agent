@@ -8,11 +8,15 @@ export type Saved={hostId?:string;account?:Account;attempt?:Attempt;transfer?:im
 type Attempt={ownerId:string;state:string;nonce:string;verifier:string;clientId:string;expiresAt:number};
 
 type Settings={origin:string}&(
-  {localSecret:string;directory?:string}
+  {localSecret:string;directory?:string;authorizationHostId?:string}
   |{stateKey:string;client?:OAuthClient;planScopes:string[];mode?:'self-hosted'});
 
 export function createChatGptSession(settings:Settings) {
   const hosted='stateKey' in settings;
+  const authorizationHostId=hosted?undefined:settings.authorizationHostId;
+  if(authorizationHostId&&!/^urn:uuid:[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(authorizationHostId)) {
+    throw new PlanError('CHATGPT_INVALID_TRANSFER',400);
+  }
   const selfHosted=hosted&&settings.mode==='self-hosted';
   const provider=hosted&&!selfHosted?settings.client:undefined;
   const planScopes=hosted&&!selfHosted?settings.planScopes:localPlanScopes;
@@ -49,7 +53,7 @@ export function createChatGptSession(settings:Settings) {
       const nonce=randomBytes(32).toString('base64url');
       const verifier=randomBytes(48).toString('base64url');
       const clientId=provider?.id??saved.account?.clientId??initialClient;
-      const hostId=hosted?undefined:saved.hostId??'urn:uuid:'+randomUUID();
+      const hostId=hosted?undefined:authorizationHostId??saved.hostId??'urn:uuid:'+randomUUID();
       await save({...saved,hostId,attempt:{ownerId,state,nonce,verifier,clientId,expiresAt:Date.now()+600_000}});
       const url=new URL('/api/accounts/authorize',issuer);
       url.search=new URLSearchParams({client_id:clientId,response_type:'code',redirect_uri:callback,

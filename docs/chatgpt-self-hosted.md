@@ -48,7 +48,7 @@ Use absolute file paths appropriate to your OS. Open the printed OpenAI authoriz
 
 Sign in with your eligible ChatGPT account, select the intended workspace, and authorize Harbor Agent to use your plan. The initial dynamic registration issues a client ID; no partner client secret or API key is required by this flow.
 
-The CLI validates OpenAI's signed ID token and granted plan scopes, then encrypts the credential record to the VM's public key. It writes the output with exclusive creation and restrictive permissions. Existing output files are never overwritten. Local saved credentials use the OS user data directory by default; use `--directory` to choose a protected alternative.
+The CLI validates OpenAI's signed ID token and granted plan scopes, then encrypts the credential record to the VM's public key. It writes the output with exclusive creation and restrictive permissions. Existing output files are never overwritten. The local helper authorizes the target VM's host ID and keeps a separate credential cache for each VM in the OS user data directory by default; use `--directory` to choose a protected alternative. Later authorizations reuse that VM's host ID and the registration's issued client ID.
 
 After export, the local copy drops its tokens without revoking them: the VM must become the only refresher of the renewable session. The retained local account/client mapping supports subsequent reauthorization. Keep the same account and workspace.
 

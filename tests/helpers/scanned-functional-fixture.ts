@@ -1,4 +1,5 @@
 import { createCanvas } from '@napi-rs/canvas';
+import {readFileSync} from 'node:fs';
 
 export function scannedFunctionalImage(page = 1) {
   const canvas = createCanvas(1600, 1900);
@@ -57,12 +58,9 @@ export const harborLanguageSamples = [
 ] as const;
 
 export function harborLanguagesImage() {
-  const canvas = createCanvas(1800, 1500); const context = canvas.getContext('2d');
-  context.fillStyle = '#fff'; context.fillRect(0, 0, canvas.width, canvas.height);
-  context.fillStyle = '#111'; context.font = '38px Arial';
-  context.fillText('HARBOR HEALTH - SYNTHETIC MULTILINGUAL OCR TEST', 70, 100);
-  harborLanguageSamples.forEach(([code, text], index) => context.fillText(`${code.toUpperCase()}: ${text}`, 70, 240 + index * 140));
-  return canvas.toBuffer('image/jpeg');
+  // A fixed, synthetic raster keeps diacritics identical on Linux and Windows;
+  // rendering it with an OS-dependent Arial fallback changes the OCR input.
+  return readFileSync(new URL('../fixtures/multilingual-functional.jpg',import.meta.url));
 }
 
 export function harborLanguagesPdf() {

@@ -49,7 +49,7 @@ function owner() {
 async function localLogin() {
   if(!values.recipient||!values.output)throw new Error('CHATGPT_TRANSFER_FILES_REQUIRED');
   const recipient=validateRecipient(JSON.parse(await readSmall(values.recipient)));
-  const directory=resolve(values.directory??join(process.env.LOCALAPPDATA||homedir(),'harbor-agent','chatgpt-cli'));
+  const directory=resolve(values.directory??join(process.env.LOCALAPPDATA||homedir(),'harbor-agent','chatgpt-cli',recipient.hostId.slice(9)));
   await mkdir(directory,{recursive:true,mode:0o700});
   const keyFile=join(directory,'local.key');
   try {await writeProtected(keyFile,randomBytes(32).toString('hex'));}catch(e){if((e as NodeJS.ErrnoException).code!=='EEXIST')throw e;}
@@ -58,7 +58,8 @@ async function localLogin() {
   const port=Number(values.port??1455);
   if(!Number.isInteger(port)||port<1024||port>65535)throw new Error('CHATGPT_PORT_INVALID');
   const origin='http://127.0.0.1:'+port;
-  const session=createChatGptSession({origin,localSecret,directory});
+  // This local helper performs authorization for the target VM's runtime.
+  const session=createChatGptSession({origin,localSecret,directory,authorizationHostId:recipient.hostId});
   let settle!:(error?:Error)=>void;
   const finished=new Promise<void>((resolve,reject)=>{settle=e=>e?reject(e):resolve();});
   const server=createServer((request,response)=>{
