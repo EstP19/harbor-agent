@@ -3,6 +3,7 @@ import {createRemoteJWKSet,jwtVerify} from 'jose';
 export const issuer='https://auth.openai.com';
 export const resource='https://api.openai.com/v1';
 export const localPlanScopes=['resource.invoke','chatgpt.tokens.use.direct'];
+export type ReasoningEffort='none'|'low'|'medium'|'high'|'xhigh'|'max';
 export type OAuthClient={id:string;method:'none'|'client_secret_basic'|'client_secret_post';secret?:string};
 const keys=createRemoteJWKSet(new URL('/.well-known/jwks.json',issuer));
 
@@ -74,7 +75,7 @@ function inferenceError(code:unknown,status?:number) {
   return new PlanError('CHATGPT_UNAVAILABLE',502);
 }
 
-export async function availableModels(accessToken:string) {
+export async function availableModels(accessToken:string):Promise<Array<{id:string;name:string}>> {
   const response=await fetch(resource+'/models',{
     headers:{Authorization:`Bearer ${accessToken}`},redirect:'error',signal:AbortSignal.timeout(15_000),
   });
@@ -89,11 +90,12 @@ export async function availableModels(accessToken:string) {
   return models;
 }
 
-export async function generateInternalResponse(accessToken:string,model:string,prompt:string) {
+export async function generateInternalResponse(accessToken:string,model:string,prompt:string,reasoningEffort?:ReasoningEffort) {
   const response=await fetch(resource+'/responses',{
     method:'POST',redirect:'error',signal:AbortSignal.timeout(120_000),
     headers:{Authorization:`Bearer ${accessToken}`,'Content-Type':'application/json'},
-    body:JSON.stringify({model,input:[{role:'user',content:prompt}],store:false,stream:true}),
+    body:JSON.stringify({model,input:[{role:'user',content:prompt}],store:false,stream:true,
+      ...(reasoningEffort?{reasoning:{effort:reasoningEffort}}:{})}),
   });
   if(!response.ok) {
     const problem=await response.json().catch(()=>null);

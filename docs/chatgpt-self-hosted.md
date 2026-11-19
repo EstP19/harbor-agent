@@ -12,11 +12,15 @@ HARBOR_CHATGPT_PUBLIC_ORIGIN=https://developer.myharborliving.com
 HARBOR_CHATGPT_AGENT_HOST=harbor-agent:2000
 HARBOR_CHATGPT_STATE_KEY=<32-random-bytes-as-64-hex-characters>
 HARBOR_CHATGPT_OWNER_ID=<your-existing-Developer-IAM-user-UUID>
+HARBOR_CHATGPT_MODEL=gpt-6-luna
+HARBOR_CHATGPT_REASONING_EFFORT=high
 HARBOR_DEVELOPER_SERVICE_TOKEN=<a-unique-shared-service-token>
 DATABASE_URL=<your-Agent-runtime-PostgreSQL-connection>
 ```
 
 Use your real private network alias in place of `harbor-agent`. Keep the encryption key stable and secret. Generate it in the server's protected environment; do not paste it into chat or commit it. Do not configure partner client credentials for this mode.
+
+The optional model and reasoning settings apply to ChatGPT internal tasks. With the example above, the panel lists only GPT-6-Luna from the authorized account's catalog and Agent sends `reasoning: { effort: "high" }`. Requests selecting another model are rejected rather than silently changing models. Omit these settings to retain account-wide model selection and the model's default reasoning effort.
 
 On Developer, configure the same `HARBOR_CHATGPT_PUBLIC_ORIGIN` and `HARBOR_DEVELOPER_SERVICE_TOKEN`, plus `HARBOR_CHATGPT_AGENT_URL=http://harbor-agent:2000`. Its HTTPS proxy must preserve the expected host and send `X-Forwarded-Proto: https`.
 

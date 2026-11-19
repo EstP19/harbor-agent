@@ -2,6 +2,7 @@ import type {IncomingMessage,ServerResponse} from 'node:http';
 import {createChatGptSession} from './session.ts';
 import {availableModels,generateInternalResponse,PlanError} from './openai.ts';
 import type {OAuthClient} from './openai.ts';
+import {chatGptGenerationSettings} from './generation-settings.ts';
 import {verifyHealthServiceAuthorization} from '../health-detailed-explanation/service-auth.ts';
 
 const prefix='/api/internal/chatgpt-plan/';
@@ -65,20 +66,27 @@ export async function handleChatGptPlan(request:IncomingMessage,response:ServerR
   try {
     const operation=path.slice(prefix.length);
     const input=await readBody(request);
+    const settings=chatGptGenerationSettings();
     switch(operation) {
-      case 'status':send(200,await session.status(ownerId));break;
+      case 'status':send(200,{...await session.status(ownerId),...settings});break;
       case 'connect':send(200,await session.start(ownerId));break;
       case 'callback':send(200,await session.complete(ownerId,input));break;
       case 'disconnect':send(200,await session.disconnect(ownerId));break;
-      case 'models':send(200,{models:await availableModels(await session.accessToken(ownerId))});break;
+      case 'models':{
+        const catalog=await availableModels(await session.accessToken(ownerId));
+        const models=settings.model?catalog.filter(item=>item.id===settings.model):catalog;
+        if(!models.length)throw new PlanError('CHATGPT_MODELS_UNAVAILABLE',502);
+        send(200,{models});break;
+      }
       case 'run': {
         const {prompt,model}=input;
         if(typeof prompt!=='string'||!prompt.trim()||prompt.length>10_000
           ||typeof model!=='string'||!/^[-a-z0-9._]{1,128}$/i.test(model)) {
           throw new PlanError('CHATGPT_INVALID_REQUEST',400);
         }
-        const answer=await generateInternalResponse(await session.accessToken(ownerId),model,prompt.trim());
-        send(200,{answer});
+        if(settings.model&&model!==settings.model)throw new PlanError('CHATGPT_INVALID_REQUEST',400);
+        const answer=await generateInternalResponse(await session.accessToken(ownerId),model,prompt.trim(),settings.reasoningEffort);
+        send(200,{answer,...settings});
         break;
       }
       default:send(404,{error:'CHATGPT_UNAVAILABLE'});

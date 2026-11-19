@@ -39,6 +39,7 @@ test('only the linked Developer can run internal Responses requests through the 
   let authorization:URL,refreshes=0,completed=0,revoked=0;
   let limitReached=false;
   let httpLimitReached=false;
+  let highReasoning=false;
   t.mock.method(globalThis,'fetch',async (input:string,init:RequestInit)=>{
     const url=new URL(input);
     if(url.pathname.endsWith('/oauth/token')) {
@@ -71,7 +72,8 @@ test('only the linked Developer can run internal Responses requests through the 
       {slug:'hidden-model',display_name:'Hidden model',visibility:'hidden'},
     ]});
     assert.equal(url.pathname,'/v1/responses');
-    assert.deepEqual(JSON.parse(String(init.body)),{model:'eligible-model',input:[{role:'user',content:'Internal task'}],store:false,stream:true});
+    assert.deepEqual(JSON.parse(String(init.body)),{model:'eligible-model',input:[{role:'user',content:'Internal task'}],store:false,stream:true,
+      ...(highReasoning?{reasoning:{effort:'high'}}:{})});
     if(httpLimitReached)return Response.json({error:{code:'subscription_sharing_usage_limit_exceeded'}},{status:402});
     if(limitReached)return new Response('data: {"type":"response.failed","response":{"error":{"code":"subscription_sharing_usage_limit_exceeded"}}}\n\n');
     completed++;
@@ -114,6 +116,18 @@ test('only the linked Developer can run internal Responses requests through the 
   assert.deepEqual(task.data,{answer:'Internal answer'});
   assert.equal(refreshes,1);
   assert.equal(completed,1);
+  Object.assign(process.env,{HARBOR_CHATGPT_MODEL:'eligible-model',HARBOR_CHATGPT_REASONING_EFFORT:'high'});
+  t.after(()=>{delete process.env.HARBOR_CHATGPT_MODEL;delete process.env.HARBOR_CHATGPT_REASONING_EFFORT;});
+  highReasoning=true;
+  assert.deepEqual((await call('status')).data,{connected:true,email:'owner@example.invalid',model:'eligible-model',reasoningEffort:'high'});
+  assert.deepEqual((await call('models')).data.models,[{id:'eligible-model',name:'Eligible model'}]);
+  assert.equal((await call('run',{...run,model:'different-model'})).status,400);
+  assert.equal(completed,1);
+  assert.deepEqual((await call('run',{...run,reasoningEffort:'none'})).data,
+    {answer:'Internal answer',model:'eligible-model',reasoningEffort:'high'});
+  process.env.HARBOR_CHATGPT_REASONING_EFFORT='invalid';
+  assert.deepEqual(await call('status'),{status:503,data:{error:'CHATGPT_CONFIG_INVALID'}});
+  process.env.HARBOR_CHATGPT_REASONING_EFFORT='high';
   limitReached=true;
   assert.equal((await call('run',run)).status,429);
   httpLimitReached=true;
