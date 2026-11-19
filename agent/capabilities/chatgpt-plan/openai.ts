@@ -107,11 +107,13 @@ export async function generateResponse(accessToken:string,params:ResponseGenerat
   params.signal?.throwIfAborted();
   const timeout=AbortSignal.timeout(params.timeoutMs??120_000);
   const signal=params.signal?AbortSignal.any([params.signal,timeout]):timeout;
+  // JSON mode checks input messages, not the separate instructions field.
+  const prompt=params.json?`${params.prompt}\n\nReturn only a valid JSON object.`:params.prompt;
   const content=params.imageBase64?[
-    {type:'input_text',text:params.prompt},
+    {type:'input_text',text:prompt},
     {type:'input_image',image_url:params.imageBase64.startsWith('data:')?params.imageBase64
       :`data:${params.imageMimeType||'image/jpeg'};base64,${params.imageBase64}`},
-  ]:params.prompt;
+  ]:prompt;
   const response=await fetch(resource+'/responses',{
     method:'POST',redirect:'error',signal,
     headers:{Authorization:`Bearer ${accessToken}`,'Content-Type':'application/json'},

@@ -25,12 +25,14 @@ test('text and image requests use the plan first, Luna high, and the supported R
   assert.deepEqual(result.parsed,{ok:true});
   assert.equal(result.billingSource,'chatgpt-plan');
   assert.deepEqual(bodies[0],{model:'gpt-6-luna',input:[{role:'user',content:[
-    {type:'input_text',text:base.prompt},{type:'input_image',image_url:'data:image/png;base64,aW1hZ2U='},
+    {type:'input_text',text:base.prompt+'\n\nReturn only a valid JSON object.'},{type:'input_image',image_url:'data:image/png;base64,aW1hZ2U='},
   ]}],store:false,stream:true,instructions:'Extract synthetic data\n\nReturn only a valid JSON object.',
     text:{format:{type:'json_object'}},reasoning:{effort:'high'}});
+  await generate(base);
+  assert.equal(bodies[1].input[0].content,base.prompt+'\n\nReturn only a valid JSON object.');
   await generate({prompt:'Plain task'});
-  assert.equal(bodies[1].input[0].content,'Plain task');
-  assert.equal(bodies[1].text,undefined);
+  assert.equal(bodies[2].input[0].content,'Plain task');
+  assert.equal(bodies[2].text,undefined);
 });
 
 test('limits, expired sessions, invalid JSON, incomplete streams and network failures activate the API backup',async t=>{
