@@ -98,6 +98,7 @@ export type ResponseGeneration={
   imageBase64?:string;
   imageMimeType?:string;
   json?:boolean;
+  jsonSchema?:{name:string;schema:Record<string,unknown>};
   signal?:AbortSignal;
   timeoutMs?:number;
 };
@@ -119,7 +120,8 @@ export async function generateResponse(accessToken:string,params:ResponseGenerat
     headers:{Authorization:`Bearer ${accessToken}`,'Content-Type':'application/json'},
     body:JSON.stringify({model:params.model,input:[{role:'user',content}],store:false,stream:true,
       ...(params.instructions?{instructions:params.instructions}:{}),
-      ...(params.json?{text:{format:{type:'json_object'}}}:{}),
+      ...(params.json?{text:{format:params.jsonSchema
+        ?{type:'json_schema',...params.jsonSchema,strict:true}:{type:'json_object'}}}:{}),
       ...(params.reasoningEffort?{reasoning:{effort:params.reasoningEffort}}:{})}),
   });
   if(!response.ok) {

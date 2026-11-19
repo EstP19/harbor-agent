@@ -21,3 +21,10 @@ export const doctorQuestionsOutputSchema = z.object({
 
 export type DoctorQuestionsCapsule = z.infer<typeof doctorQuestionsCapsuleSchema>;
 export type DoctorQuestionsOutput = z.infer<typeof doctorQuestionsOutputSchema>;
+
+// The provider enforces the envelope; the existing validator still enforces grounding and clinical safety.
+export const doctorQuestionsJsonSchema = {
+  name:'harbor_doctor_questions',
+  schema:{type:'object',properties:{questions:{type:'array',items:{type:'string'},minItems:3,maxItems:7}},
+    required:['questions'],additionalProperties:false},
+};

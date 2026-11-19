@@ -5,12 +5,28 @@ import {join} from 'node:path';
 import test from 'node:test';
 import {createPreferredGeneration} from '../agent/capabilities/chatgpt-plan/preferred-generation.ts';
 import {generateResponse,PlanError} from '../agent/capabilities/chatgpt-plan/openai.ts';
+import {doctorQuestionsJsonSchema} from '../agent/capabilities/health-doctor-questions/schema.ts';
 
 const owner='11111111-1111-4111-8111-111111111111';
 const environment={HARBOR_CHATGPT_OWNER_ID:owner,HARBOR_CHATGPT_MODEL:'gpt-6-luna',
   HARBOR_CHATGPT_REASONING_EFFORT:'high',OPENAI_API_KEY:'sk-test-backup'};
 const base={prompt:'Synthetic request',json:true};
 const stream=(text:string)=>new Response(`data: ${JSON.stringify({type:'response.output_text.delta',delta:text})}\n\ndata: {"type":"response.completed"}\n\n`);
+
+test('doctor questions use a strict root array envelope on both subscription and API backup',async t=>{
+  let calls=0;
+  t.mock.method(globalThis,'fetch',async(_url:string,init:RequestInit)=>{
+    const body=JSON.parse(String(init.body));
+    assert.deepEqual(body.text.format,{type:'json_schema',...doctorQuestionsJsonSchema,strict:true});
+    calls++;
+    if(calls===1)return Response.json({error:{code:'subscription_sharing_usage_limit_exceeded'}},{status:429});
+    return stream('{"questions":["One?","Two?","Three?"]}');
+  });
+  const generate=createPreferredGeneration({environment,accessToken:async()=> 'synthetic-plan-token',audit:()=>{}});
+  const result=await generate({...base,jsonSchema:doctorQuestionsJsonSchema});
+  assert.equal(result.billingSource,'api-key');assert.equal(calls,2);
+  assert.ok(Array.isArray(result.parsed?.questions));
+});
 
 test('text and image requests use the plan first, Luna high, and the supported Responses contract',async t=>{
   const bodies:any[]=[];

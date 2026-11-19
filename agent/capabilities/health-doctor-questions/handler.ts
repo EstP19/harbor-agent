@@ -67,7 +67,7 @@ export function createDoctorQuestionsHandler(dependencies: {
       `1. Cada pregunta DEBE empezar con una palabra interrogativa: ${opener}.`,
       `2. Cada pregunta debe incluir el nombre aprobado completo de uno de los temas, sin abreviarlo. Usa únicamente palabras de ese tema y estas palabras gramaticales: ${doctorQuestionGrammar(capsule.languageCode).join(', ')}.`,
       `3. No añadas hábitos, prevención, consejos, datos personales ni hechos clínicos ajenos al texto. No uses pronombres personales. No afirmes ni sugieras diagnósticos, tratamientos, dosis, urgencias o riesgos. Si un nombre aprobado contiene un término clínico, solo puedes repetirlo dentro de ese nombre.`,
-      `4. Devuelve ÚNICAMENTE un objeto JSON válido con la clave "questions": {"questions": ["¿...?", "¿...?", ...]}`,
+      '4. La raíz del JSON debe ser exactamente {"questions":["pregunta 1?","pregunta 2?","pregunta 3?"]}. "questions" es un arreglo de textos, nunca un objeto. No anides otro objeto "questions" ni agregues envoltorios. Respeta el idioma y la cantidad solicitados.',
     ].join('\n');
 
     const userPrompt = topicLines;
@@ -87,6 +87,7 @@ export function createDoctorQuestionsHandler(dependencies: {
           candidate = await dependencies.completion({ systemPrompt, userPrompt: attempt === 0 ? userPrompt : [
             userPrompt,
             'La respuesta anterior no cumplió la validación. Reescribe las preguntas usando SOLAMENTE el nombre aprobado completo y las palabras gramaticales permitidas. No añadas ninguna otra palabra ni concepto. Comprueba cada palabra antes de responder.',
+            'Comprueba también el formato: un único objeto raíz con "questions" como arreglo de textos, sin otro objeto anidado.',
           ].join('\n\n') }, signal);
           const parsedCandidate = doctorQuestionsOutputSchema.safeParse(candidate);
           if (parsedCandidate.success && validateDoctorQuestionsOutput(capsule, parsedCandidate.data).ok) return parsedCandidate.data;
@@ -103,8 +104,8 @@ export function createDoctorQuestionsHandler(dependencies: {
         }
         return candidate;
       }, providerTimeoutMs);
-    } catch (e: any) {
-      console.warn('[health-doctor-questions] Completion failed:', e?.message || e);
+    } catch {
+      console.warn('[health-doctor-questions] Completion unavailable');
       try { await finalize('failed'); } catch {}
       return { ok: false, code: 'DOCTOR_QUESTIONS_TEMPORARY_FAILURE' };
     }
@@ -112,7 +113,7 @@ export function createDoctorQuestionsHandler(dependencies: {
     const output = doctorQuestionsOutputSchema.safeParse(raw);
     const validation = output.success ? validateDoctorQuestionsOutput(capsule, output.data) : null;
     if (!output.success || !validation?.ok) {
-      console.warn('[health-doctor-questions] Output rejected — zod success:', output.success, '| validation:', validation, '| raw:', JSON.stringify(raw));
+      console.warn('[health-doctor-questions] Output rejected', {schemaValid:output.success,code:validation&&!validation.ok?validation.code:'SCHEMA'});
       try { await finalize('rejected'); } catch {}
       return { ok: false, code: 'DOCTOR_QUESTIONS_OUTPUT_REJECTED' };
     }

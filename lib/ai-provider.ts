@@ -9,6 +9,7 @@ export interface AiCompletionParams {
   geminiModel?: string;
   provider?: 'gemini' | 'openai';
   signal?: AbortSignal;
+  jsonSchema?: {name:string;schema:Record<string,unknown>};
 }
 
 export interface AiCompletionResult {
@@ -33,7 +34,7 @@ export async function generateAiJsonResponse(
   if(process.env.HARBOR_AI_PRIMARY==='chatgpt') {
     try {
       const result=await generatePreferredResponse({prompt:params.userPrompt,instructions:params.systemPrompt,
-        imageBase64:params.imageBase64,imageMimeType:params.imageMimeType,json:true,signal:params.signal});
+        imageBase64:params.imageBase64,imageMimeType:params.imageMimeType,json:true,jsonSchema:params.jsonSchema,signal:params.signal});
       return {...result,parsed:result.parsed};
     } catch(error) {
       params.signal?.throwIfAborted();

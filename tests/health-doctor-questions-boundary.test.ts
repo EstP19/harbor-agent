@@ -13,6 +13,25 @@ const capsule: DoctorQuestionsCapsule = {
   topics: [{ conceptCode: 'GLUCOSE', approvedName: 'Glucose', generalTopic: 'Glucose heeft een algemene rol in de energiehuishouding.' }],
 };
 
+test('nested question envelopes are repaired once and never bypass clinical validation',async()=>{
+  const good={questions:['Wat is glucose?','Welke rol heeft glucose?','Welke algemene rol heeft glucose?']};
+  for(const repaired of [true,false]) {
+    let calls=0;let finalStatus='';
+    const handler=createDoctorQuestionsHandler({
+      reservation:{claim:async()=>({kind:'claimed' as const,claimToken:'claim'}),finalize:async value=>{finalStatus=value.status;}},
+      completion:async prompt=>{
+        calls++;
+        assert.match(prompt.systemPrompt,/"questions" es un arreglo de textos/);
+        if(calls===2)assert.match(prompt.userPrompt,/sin otro objeto anidado/);
+        return calls===2&&repaired?good:{questions:good};
+      },
+    });
+    const result=await handler(capsule);
+    assert.equal(result.ok,repaired);assert.equal(calls,2);
+    assert.equal(finalStatus,repaired?'completed':'rejected');
+  }
+});
+
 test('doctor questions capsule accepts only approved general topic fields', () => {
   assert.equal(doctorQuestionsCapsuleSchema.safeParse(capsule).success, true);
   for (const forbidden of ['idempotencyKey', 'manifestId', 'subjectId', 'userId', 'sessionId', 'value', 'unit', 'range', 'flag', 'documentId', 'profile', 'extractedText', 'topicTitle', 'topicSummary']) {

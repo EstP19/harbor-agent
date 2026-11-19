@@ -29,6 +29,7 @@ import { handleImagingKbAnalysisHttp } from './capabilities/health-imaging-kb-an
 import { handleFunctionalKbAnalysisHttp } from './capabilities/health-functional-kb-analysis/route.ts';
 import { extractFunctionalText } from './extractors/functional-text-extractor.ts';
 import { createDoctorQuestionsHandler } from './capabilities/health-doctor-questions/handler.ts';
+import { doctorQuestionsJsonSchema } from './capabilities/health-doctor-questions/schema.ts';
 import { PostgresDoctorQuestionsReservation } from './capabilities/health-doctor-questions/reservation.ts';
 import { handleDoctorQuestionsHttpRequest, readDoctorQuestionsBody } from './capabilities/health-doctor-questions/route.ts';
 import { handleConsultationReviewRequest } from './capabilities/health-consultation-review/handler.ts';
@@ -66,7 +67,7 @@ const detailedExplanationHandler = createDetailedExplanationHandler({
 const doctorQuestionsHandler = createDoctorQuestionsHandler({
   reservation: new PostgresDoctorQuestionsReservation({ query }),
   completion: async (prompt, signal) => {
-    const result = await generateAiJsonResponse({ ...prompt, geminiModel: 'gemini-3.1-flash-lite', temperature: 0.2, signal });
+    const result = await generateAiJsonResponse({ ...prompt, geminiModel: 'gemini-3.1-flash-lite', temperature: 0.2, signal, jsonSchema:doctorQuestionsJsonSchema });
     if (!result?.parsed) throw new Error('questions unavailable');
     return result.parsed;
   },
