@@ -1,0 +1,15 @@
+.git
+.github
+**/.env*
+**/node_modules
+.next
+.expo
+.vercel
+.worktrees
+coverage
+dist
+dist-*
+*.log
+*.tsbuildinfo
+.eve
+.output

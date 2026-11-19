@@ -1,0 +1,45 @@
+name: Validate public source
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: fixture-ci-password
+          POSTGRES_DB: harbor_chatgpt_test_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      HARBOR_CHATGPT_TEST_DATABASE_URL: postgresql://agent_api:fixture-ci-password@127.0.0.1:5432/harbor_chatgpt_test_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - name: Initialize isolated PostgreSQL session store
+        env:
+          DATABASE_URL: postgresql://postgres:fixture-ci-password@127.0.0.1:5432/harbor_chatgpt_test_ci
+        run: |
+          node --input-type=module <<'NODE'
+          import pg from 'pg';
+          import {readFile} from 'node:fs/promises';
+          const client=new pg.Client({connectionString:process.env.DATABASE_URL});
+          await client.connect();
+          try {
+            await client.query("CREATE ROLE harbor_db_owner; CREATE ROLE health_api; CREATE ROLE readonly_auditor; CREATE ROLE agent_api LOGIN PASSWORD 'fixture-ci-password'; CREATE SCHEMA agent_core AUTHORIZATION harbor_db_owner; GRANT USAGE ON SCHEMA agent_core TO agent_api;");
+            await client.query(await readFile('docker-migrations/180_chatgpt_plan_session.sql','utf8'));
+          } finally { await client.end(); }
+          NODE
+      - run: npm test

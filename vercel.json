@@ -1,0 +1,11 @@
+{
+  "functions": {
+    "api/handler.ts": {
+      "includeFiles": "node_modules/{pdf-parse/dist/pdf-parse/cjs/pdf.worker.mjs,pdfjs-dist/legacy/build/pdf.worker.mjs,tesseract.js/**,tesseract.js-core/**,@tesseract.js-data/*/4.0.0_best_int/*,@napi-rs/canvas*/**}",
+      "maxDuration": 300
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/handler" }
+  ]
+}
