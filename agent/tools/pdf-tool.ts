@@ -300,7 +300,7 @@ export default defineTool({
     const apiKey = process.env.OPENAI_API_KEY;
     const geminiKey = process.env.GEMINI_API_KEY;
 
-    if ((apiKey && apiKey.length > 10) || (geminiKey && geminiKey.length > 10)) {
+    if (process.env.HARBOR_AI_PRIMARY === 'chatgpt' || (apiKey && apiKey.length > 10) || (geminiKey && geminiKey.length > 10)) {
       try {
         console.log(`[harbor-agent :pdfTool] 🤖 Estructurando datos de PDF (${category}) con LLM...`);
 

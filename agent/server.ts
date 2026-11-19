@@ -18,7 +18,6 @@ import ingestTool from './tools/ingest-tool.ts';
 import { handleMarkerExplanation, handleMedicationExplanation, handleConditionExplanation } from '../lib/routes.ts';
 import { generateAiJsonResponse } from '../lib/ai-provider.ts';
 import { query } from '../lib/db.ts';
-import { createDetailedExplanationCompletion } from './capabilities/health-detailed-explanation/completion.ts';
 import { createDetailedExplanationHandler } from './capabilities/health-detailed-explanation/handler.ts';
 import { PostgresDetailedExplanationReservation } from './capabilities/health-detailed-explanation/reservation.ts';
 import { handleDetailedExplanationHttpRequest, readDetailedExplanationBody } from './capabilities/health-detailed-explanation/route.ts';
@@ -41,7 +40,7 @@ const HOST = process.env.HOST || '0.0.0.0';
 
 const detailedExplanationHandler = createDetailedExplanationHandler({
   completion: async (prompt, signal) => {
-    console.log(`[health-detailed-explanation] 🤖 Solicitando generación de explicación a proveedor de IA (Gemini / OpenAI)...`);
+    console.log(`[health-detailed-explanation] 🤖 Solicitando generación de explicación a proveedor de IA configurado...`);
     const result = await generateAiJsonResponse({ ...prompt, temperature: 0.2, signal });
     if (!result?.parsed) {
       console.warn(`[health-detailed-explanation] ⚠️ No se obtuvo JSON válido del proveedor de IA.`);

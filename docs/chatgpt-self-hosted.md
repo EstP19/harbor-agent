@@ -14,13 +14,19 @@ HARBOR_CHATGPT_STATE_KEY=<32-random-bytes-as-64-hex-characters>
 HARBOR_CHATGPT_OWNER_ID=<your-existing-Developer-IAM-user-UUID>
 HARBOR_CHATGPT_MODEL=gpt-6-luna
 HARBOR_CHATGPT_REASONING_EFFORT=high
+HARBOR_AI_PRIMARY=chatgpt
+OPENAI_API_KEY=<optional-API-key-for-automatic-backup>
 HARBOR_DEVELOPER_SERVICE_TOKEN=<a-unique-shared-service-token>
 DATABASE_URL=<your-Agent-runtime-PostgreSQL-connection>
 ```
 
 Use your real private network alias in place of `harbor-agent`. Keep the encryption key stable and secret. Generate it in the server's protected environment; do not paste it into chat or commit it. Do not configure partner client credentials for this mode.
 
-The optional model and reasoning settings apply to ChatGPT internal tasks. With the example above, the panel lists only GPT-6-Luna from the authorized account's catalog and Agent sends `reasoning: { effort: "high" }`. Requests selecting another model are rejected rather than silently changing models. Omit these settings to retain account-wide model selection and the model's default reasoning effort.
+With `HARBOR_AI_PRIMARY=chatgpt`, all REST generative capabilities and Developer tasks use the linked owner's plan first. Text, images, OCR/PDF structuring, explanations, doctor questions, and consultation reviews share one Responses transport. GPT-6-Luna with high reasoning is the default in this mode. Model and effort overrides apply equally to the plan and API-key backup. The panel lists only the configured model; requests selecting another model are rejected.
+
+Configure `OPENAI_API_KEY` for automatic backup. Optional `OPENAI_API_KEY_1` is a second, deduplicated backup credential. Each credential is attempted at most once per request. Backup activates on plan/session availability failures, usage limits, incomplete output, or invalid JSON. Caller cancellation, model refusal/content filtering, and ownership/configuration errors never trigger another credential. Logs identify `billingSource`, model, and effort without recording prompts, documents, or credentials. API backup is billed separately from the ChatGPT subscription.
+
+Embeddings continue to use `/v1/embeddings` with an API key; ChatGPT plan tokens do not grant that endpoint. Deterministic KB selection, clinical validation, and local extraction fallbacks retain their existing behavior. The optional Eve harness is not part of the deployed REST entry point. Without `HARBOR_AI_PRIMARY=chatgpt`, the existing legacy Gemini/OpenAI REST provider selection is preserved.
 
 On Developer, configure the same `HARBOR_CHATGPT_PUBLIC_ORIGIN` and `HARBOR_DEVELOPER_SERVICE_TOKEN`, plus `HARBOR_CHATGPT_AGENT_URL=http://harbor-agent:2000`. Its HTTPS proxy must preserve the expected host and send `X-Forwarded-Proto: https`.
 
@@ -78,5 +84,7 @@ Use **Manage usage** to inspect plan limits. **Disconnect ChatGPT** attempts to 
 ## Checks and limits
 
 Run `npm test` and `npm run typecheck`. The database integration test additionally needs an isolated, loopback PostgreSQL database named `harbor_chatgpt_test_...`, supplied through `HARBOR_CHATGPT_TEST_DATABASE_URL`.
+
+After deploying, run `node --experimental-strip-types scripts/verify-ai-routing.ts` inside the container. It sends synthetic text and an image through the plan, exercises the authenticated Health OCR and Developer HTTP routes, then simulates a plan usage-limit failure in an isolated factory to make a real API-backup request. It does not disconnect or alter the saved session. This check spends a small amount of subscription and API usage and prints only verification metadata.
 
 OpenAI controls access and plan limits. Follow its [preview limitations](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations). The VM guide currently states that host-specific usage attribution and revocation for transferred sessions are unavailable.

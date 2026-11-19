@@ -1,33 +1,11 @@
 import type {IncomingMessage,ServerResponse} from 'node:http';
-import {createChatGptSession} from './session.ts';
+import {session,hosted,internalHost,secret} from './runtime.ts';
+import {generatePreferredResponse} from './preferred-generation.ts';
 import {availableModels,generateInternalResponse,PlanError} from './openai.ts';
-import type {OAuthClient} from './openai.ts';
 import {chatGptGenerationSettings} from './generation-settings.ts';
 import {verifyHealthServiceAuthorization} from '../health-detailed-explanation/service-auth.ts';
 
 const prefix='/api/internal/chatgpt-plan/';
-const origin=process.env.HARBOR_CHATGPT_LOCAL_ORIGIN;
-const publicOrigin=process.env.HARBOR_CHATGPT_PUBLIC_ORIGIN;
-const internalHost=process.env.HARBOR_CHATGPT_AGENT_HOST;
-const secret=process.env.HARBOR_DEVELOPER_SERVICE_TOKEN;
-const stateKey=process.env.HARBOR_CHATGPT_STATE_KEY;
-const clientId=process.env.HARBOR_CHATGPT_CLIENT_ID;
-const method=process.env.HARBOR_CHATGPT_CLIENT_AUTH_METHOD;
-const clientSecret=process.env.HARBOR_CHATGPT_CLIENT_SECRET;
-const planScopes=[...new Set(process.env.HARBOR_CHATGPT_PLAN_SCOPES?.trim().split(/\s+/).filter(Boolean)??[])];
-const approvedScopes=planScopes.length>0&&planScopes.every(scope=>/^[a-z0-9._:-]+$/i.test(scope))
-  &&planScopes.some(scope=>!['openid','profile','email','offline_access','resource.invoke'].includes(scope));
-const client:OAuthClient|undefined=clientId&&/^oaiapp_[a-z0-9_-]{1,200}$/i.test(clientId)&&approvedScopes
-  &&(method==='none'||((method==='client_secret_basic'||method==='client_secret_post')&&!!clientSecret))
-  ?{id:clientId,method,secret:clientSecret}:undefined;
-const hosted=!!publicOrigin;
-const session=hosted
-  ?publicOrigin&&/^https:\/\/[a-z0-9.-]+$/.test(publicOrigin)&&internalHost&&secret&&stateKey&&/^[a-f0-9]{64}$/i.test(stateKey)
-    ?createChatGptSession({origin:publicOrigin,stateKey,client,planScopes,
-      mode:process.env.HARBOR_CHATGPT_MODE==='self-hosted'?'self-hosted':undefined}):null
-  :origin&&/^http:\/\/127\.0\.0\.1:\d{1,5}$/.test(origin)&&secret&&process.env.HOST==='127.0.0.1'
-    ?createChatGptSession({origin,localSecret:secret,directory:process.env.HARBOR_CHATGPT_DATA_DIR}):null;
-
 async function readBody(request:IncomingMessage):Promise<Record<string,unknown>> {
   let length=0;
   const chunks:Buffer[]=[];
@@ -85,8 +63,18 @@ export async function handleChatGptPlan(request:IncomingMessage,response:ServerR
           throw new PlanError('CHATGPT_INVALID_REQUEST',400);
         }
         if(settings.model&&model!==settings.model)throw new PlanError('CHATGPT_INVALID_REQUEST',400);
-        const answer=await generateInternalResponse(await session.accessToken(ownerId),model,prompt.trim(),settings.reasoningEffort);
-        send(200,{answer,...settings});
+        const controller=new AbortController();
+        const cancel=()=>{if(!response.writableEnded)controller.abort();};
+        response.once('close',cancel);
+        try {
+          if(process.env.HARBOR_AI_PRIMARY==='chatgpt') {
+            const result=await generatePreferredResponse({ownerId,prompt:prompt.trim(),signal:controller.signal});
+            send(200,{answer:result.text,model:result.model,reasoningEffort:result.reasoningEffort,billingSource:result.billingSource});
+          } else {
+            const answer=await generateInternalResponse(await session.accessToken(ownerId),model,prompt.trim(),settings.reasoningEffort);
+            send(200,{answer,...settings});
+          }
+        } finally {response.off('close',cancel);}
         break;
       }
       default:send(404,{error:'CHATGPT_UNAVAILABLE'});

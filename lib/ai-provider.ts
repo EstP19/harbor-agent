@@ -1,3 +1,5 @@
+import {generatePreferredResponse} from '../agent/capabilities/chatgpt-plan/preferred-generation.ts';
+
 export interface AiCompletionParams {
   systemPrompt: string;
   userPrompt: string;
@@ -12,10 +14,14 @@ export interface AiCompletionParams {
 export interface AiCompletionResult {
   parsed: any;
   provider: 'gemini' | 'openai';
+  billingSource?: 'chatgpt-plan' | 'api-key';
+  model?: string;
+  reasoningEffort?: string;
 }
 
 /**
- * Proveedor de IA Unificado (Gemini + OpenAI con Fallback Automático)
+ * HARBOR_AI_PRIMARY=chatgpt: ChatGPT plan first, then API-key backup with the same model/effort.
+ * Without this opt-in, retain the legacy Gemini/OpenAI selection below.
  * 1. Si GEMINI_API_KEY está configurada, intenta primero con Gemini API (gemini-2.0-flash / gemini-1.5-flash / gemini-3.1-flash-lite).
  * 2. Si falla o no está configurada, utiliza OPENAI_API_KEY (gpt-4o-mini).
  * 3. Soporta multimodalidad directa (imágenes en Base64 sin necesidad de workers locales ni Tesseract).
@@ -24,6 +30,16 @@ export interface AiCompletionResult {
 export async function generateAiJsonResponse(
   params: AiCompletionParams
 ): Promise<AiCompletionResult | null> {
+  if(process.env.HARBOR_AI_PRIMARY==='chatgpt') {
+    try {
+      const result=await generatePreferredResponse({prompt:params.userPrompt,instructions:params.systemPrompt,
+        imageBase64:params.imageBase64,imageMimeType:params.imageMimeType,json:true,signal:params.signal});
+      return {...result,parsed:result.parsed};
+    } catch(error) {
+      params.signal?.throwIfAborted();
+      return null;
+    }
+  }
   const geminiKey = process.env.GEMINI_API_KEY;
   const openaiKey = process.env.OPENAI_API_KEY;
   const temp = params.temperature ?? 0.2;

@@ -12,7 +12,11 @@ The service integrates with the Harbor PostgreSQL schemas and authenticated Harb
 
 ## ChatGPT plan for personal internal tasks
 
-The optional ChatGPT connection is managed in Harbor Developer; Harbor Agent generates the answers through the public Responses API. This connection applies to the internal task panel. Other capability routes retain their existing provider selection.
+The optional ChatGPT connection is managed in Harbor Developer; Harbor Agent generates the answers through the public Responses API. Set `HARBOR_AI_PRIMARY=chatgpt` to use the linked owner's plan across REST generative capabilities: explanations, doctor questions, consultation reviews, OCR, document structuring, and Developer tasks. Set `HARBOR_CHATGPT_OWNER_ID`, `HARBOR_CHATGPT_MODEL=gpt-6-luna`, and `HARBOR_CHATGPT_REASONING_EFFORT=high`.
+
+If the plan is unavailable, at its limit, or returns unusable JSON, Agent automatically tries `OPENAI_API_KEY` and optionally `OPENAI_API_KEY_1`, using the same model and reasoning effort. This backup uses separately billed API credit. Caller cancellation, model refusal, and ownership failures do not trigger paid backup. Structured logs report the billing source without credentials or document content. With the opt-in disabled, legacy provider selection remains available.
+
+Sealed KB answers and local deterministic extraction retain their existing behavior. Vector embeddings use the separate API embeddings endpoint and cannot consume ChatGPT plan tokens. The optional Eve development harness has its own model configuration; it is not mounted by this REST server.
 
 For an open-source installation on your own VM, authorize ChatGPT on your computer and import the encrypted session into your Dokploy container. See [the complete self-hosted setup](docs/chatgpt-self-hosted.md).
 

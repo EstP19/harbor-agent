@@ -2,6 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {chatGptGenerationSettings} from '../agent/capabilities/chatgpt-plan/generation-settings.ts';
 
+test('shared generation defaults to Luna high',()=>{
+  assert.deepEqual(chatGptGenerationSettings({HARBOR_AI_PRIMARY:'chatgpt'}),{model:'gpt-6-luna',reasoningEffort:'high'});
+});
+
 test('ChatGPT generation defaults do not add overrides and reject invalid operator settings',()=>{
   assert.deepEqual(chatGptGenerationSettings({}),{});
   assert.deepEqual(chatGptGenerationSettings({HARBOR_CHATGPT_MODEL:' gpt-6-luna ',HARBOR_CHATGPT_REASONING_EFFORT:' high '}),
